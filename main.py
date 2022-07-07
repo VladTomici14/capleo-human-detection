@@ -11,20 +11,22 @@ def load_model(model):
         :return: the final model, which can be used to make predictions
     """
 
-    # ------- setting up the model path ------
-    input_size = 256
-    if model == "float16":
-        model_path = "models/lite-model_movenet_singlepose_thunder_tflite_float16_4.tflite"
+    try:
+        # ------- setting up the model path ------
+        input_size = 256
+        if model == "float16":
+            model_path = "models/lite-model_movenet_singlepose_thunder_tflite_float16_4.tflite"
 
-    elif model == "int8":
-        model_path = "models/lite-model_movenet_singlepose_thunder_tflite_int8_4.tflite"
+        elif model == "int8":
+            model_path = "models/lite-model_movenet_singlepose_thunder_tflite_int8_4.tflite"
 
-    else:
+        # ------- initializing the TFLite interpreter ---------
+        interpreter = tf.lite.Interpreter(model_path=model_path)
+        interpreter.allocate_tensors()
+
+    except Exception:
         Messages().error("Unable to load the model. Please choose a valid one (float32 / int8)")
 
-    # ------- initializing the TFLite interpreter ---------
-    interpreter = tf.lite.Interpreter(model_path=model_path)
-    interpreter.allocate_tensors()
 
 def detect_on_image(image_path):
     image = cv2.imread(image_path)
