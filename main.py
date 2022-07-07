@@ -1,5 +1,5 @@
 from messages import Messages
-
+import tensorflow as tf
 import argparse
 import cv2
 
@@ -12,6 +12,7 @@ def load_model(model):
     """
 
     # ------- setting up the model path ------
+    input_size = 256
     if model == "float16":
         model_path = "models/lite-model_movenet_singlepose_thunder_tflite_float16_4.tflite"
 
@@ -21,6 +22,9 @@ def load_model(model):
     else:
         Messages().error("Unable to load the model. Please choose a valid one (float32 / int8)")
 
+    # ------- initializing the TFLite interpreter ---------
+    interpreter = tf.lite.Interpreter(model_path=model_path)
+    interpreter.allocate_tensors()
 
 def detect_on_image(image_path):
     image = cv2.imread(image_path)
