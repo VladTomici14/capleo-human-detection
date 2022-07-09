@@ -1,9 +1,15 @@
 from predictor import MoveNetPredictor
+from matplotlib import pyplot as plt
 from messages import Messages
 import tensorflow as tf
+from PIL import Image
 import tensorflow_hub
+import numpy as np
 import argparse
 import cv2
+
+
+input_size = 256
 
 
 # TODO: add comments and the pydocs
@@ -51,10 +57,18 @@ def detect_on_image(tensor_image, model):
         Messages().error("The model was not uploaded correctly!")
         return None
 
+
+def opencv_image_2_tensorflow(opencv_image):
+    tensor_image = tf.convert_to_tensor(opencv_image, dtype=tf.float32)
+    tensor_image = tf.expand_dims(tensor_image, 0)
+
+    return tensor_image
+
+
 def image2array(tensor_image):
     # Resize and pad the image to keep the aspect ratio and fit the expected size.
     input_image = tf.expand_dims(tensor_image, axis=0)
-    input_image = tf.image.resize_with_pad(input_image, 256, 256)
+    input_image = tf.image.resize_with_pad(input_image, input_size, input_size)
 
     return input_image
 
@@ -74,12 +88,47 @@ if __name__ == "__main__":
     args = vars(ap.parse_args())
 
     model = load_model()
-    loaded_image = load_image(args["image"])
-    image_array = image2array(loaded_image)
-    key_points = detect_on_image(image_array, model)
+
+    # loaded_image = load_image(args["image"])  # <class 'tensorflow.python.framework.ops.EagerTensor'>
+    # image_array = image2array(loaded_image)
+    # key_points = detect_on_image(image_array, model)
+    #
+    # print(len(key_points[0][0]))
+
+    # FIXME : problems with loading and processing the images
 
     if args["draw"]:
-        predictor = MoveNetPredictor()
-        predictor.draw_keypoints_on_image(loaded_image, key_points)
+        Messages().success("Accessed the recognition part")
 
-    print(key_points)
+        # predictor = MoveNetPredictor()
+        # output_image_array = predictor.draw_keypoints_on_image(loaded_image, key_points)  # <class 'numpy.ndarray'>
+        # output_image = Image.fromarray(output_image_array)
+        # output_image.save("test.png")
+
+        # from matplotlib import pyplot as plt
+        # plt.imshow(output_image_array, interpolation="nearest")
+        # plt.show()
+
+    # Load the input image.
+    image_path = args["image"]
+    image = tf.io.read_file(image_path) # TODO: make sure that it supports more photo formats
+    image = tf.image.decode_jpeg(image)
+
+    # Resize and pad the image to keep the aspect ratio and fit the expected size.
+    input_image = tf.expand_dims(image, axis=0)
+    input_image = tf.image.resize_with_pad(input_image, input_size, input_size)
+
+    # Run model inference.
+    keypoints_with_scores = detect_on_image(input_image, model)
+
+    # Visualize the predictions with image.
+    display_image = tf.expand_dims(image, axis=0)
+    display_image = tf.cast(tf.image.resize_with_pad(display_image, input_size, input_size), dtype=tf.int32)
+    output_overlay = MoveNetPredictor().draw_keypoints_on_image(np.squeeze(display_image.numpy(), axis=0), keypoints_with_scores)
+
+    print(type(output_overlay))
+
+    plt.figure(figsize=(5, 5))
+    plt.imshow(output_overlay)
+    _ = plt.axis('off')
+    plt.show()
