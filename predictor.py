@@ -1,122 +1,74 @@
 from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
 from messages import Messages
+import tensorflow as tf
 from PIL import Image
 import numpy as np
 import cv2
 
+
+# TODO: work on the style of the drawings of lines and points
+# TODO: calculate the radius of the circles and the thinckness of the lines using the picture's shapes
 
 class MoveNetPredictor:
 
     def __init__(self):
         self.keypoint = Keypoint()
 
-    def keypoints_edges_display(self, keypoints, height, width, keypoint_threshold=0.11):
-        keypoints_all = []
-        edges_all = []
-        edge_colors = []
-        num_instances = keypoints.shape[0]
-
-        for index in range(num_instances):
-            kpts_x = keypoints[0, index, :, 1]
-            kpts_y = keypoints[0, index, :, 0]
-            kpts_scores = keypoints[0, index, :, 2]
-
-            kpts_absolute_xy = np.stack([width * np.array(kpts_x), height * np.array(kpts_y)], axis=-1)
-            kpts_absolute_above_thresh = kpts_absolute_xy[kpts_scores > keypoint_threshold, :]
-
-            keypoints_all.append(kpts_absolute_above_thresh)
-
-            for edge_pair, color in self.keypoint.KEYPOINT_EDGE_INDS_TO_COLOR.items():
-                if (kpts_scores[edge_pair[0]] > keypoint_threshold) and (
-                        kpts_scores[edge_pair[1]] > keypoint_threshold):
-                    x1 = kpts_absolute_xy[edge_pair[0], 0]
-                    y1 = kpts_absolute_xy[edge_pair[0], 1]
-
-                    x2 = kpts_absolute_xy[edge_pair[1], 0]
-                    y2 = kpts_absolute_xy[edge_pair[1], 1]
-
-                    line_segment = np.array([[x1, y1], [x2, y2]])
-
-                    edges_all.append(line_segment)
-                    edge_colors.append(color)
-
-        if keypoints_all:
-            keypoints_xy = np.concatenate(keypoints_all, axis=0)
-        else:
-            keypoints_xy = np.zerps((0, 17, 2))
-
-        if edges_all:
-            edges_xy = np.stack(edges_all, axis=0)
-        else:
-            edges_xy = np.zeros((0, 2, 2))
-
-        return keypoints_xy, edges_xy, edge_colors
-
-    def draw_keypoints_on_image(self, tensor_image, keypoints):
+    def detect_on_image(self, image, interpreter, input_size, drawing=True):
         """
-        This function will draw all the keypoints to the image
-            :param tensor_image:
-            :param keypoints:
-            :return:
+        This function will return the model keypoints for an image
+            :param image: the image that we want to do the detection on
+            :param interpreter: the interpreter that we want to use for the detection
+            :param drawing: the condition if we want to draw on the image that was used as an argument
+            :return: the input image but with all the lines and points drawn
         """
 
-        if keypoints is not None:
-            # ------ preparing some sizes ------
-            height, width, depth = tensor_image.shape
-            aspect_ratio = float(width) / height
+        frame = image.copy()
+        frame = tf.image.resize_with_pad(np.expand_dims(frame, axis=0), input_size, input_size)
+        input_image = tf.cast(frame, dtype=tf.float32)
 
-            # ----- configuring the plot -----
-            figure, ax = plt.subplots(figsize=(12 * aspect_ratio, 12))
-            figure.tight_layout(pad=0)
-            ax.margins(0)
-            ax.set_yticklabels([])
-            ax.set_xticklabels([])
-            plt.axis("off")
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
 
-            image = ax.imshow(tensor_image)
-            line_segments = LineCollection([], linewidths=(4), linestyles="solid")
-            ax.add_collection(line_segments)
-            scat = ax.scatter([], [], s=60, color="#FF1493", zorder=3)  # TODO: add all the colors in a class
+        interpreter.set_tensor(input_details[0]["index"], np.array(input_image))
+        interpreter.invoke()
+        keypoints_with_scores = interpreter.get_tensor(output_details[0]["index"])
 
-            (keypoints_locs,
-             keypoints_edges,
-             edge_colors) = self.keypoints_edges_display(keypoints, height, width)
+        self.draw_kpts(image, keypoints_with_scores, self.keypoint.EDGES, confidence_threshold=0.3)
 
-            line_segments.set_segments(keypoints_edges)
-            line_segments.set_colors(edge_colors)
-            if keypoints_edges.shape[0]:
-                line_segments.set_segments(keypoints_edges)
-                line_segments.set_colors(edge_colors)
-            if keypoints_locs.shape[0]:
-                scat.set_offsets(keypoints_locs)
+        return image
 
-            # TODO: think about cropping the image here
-            # if crop_region is not None:
-            #     xmin = max(crop_region['x_min'] * width, 0.0)
-            #     ymin = max(crop_region['y_min'] * height, 0.0)
-            #     rec_width = min(crop_region['x_max'], 0.99) * width - xmin
-            #     rec_height = min(crop_region['y_max'], 0.99) * height - ymin
-            #     rect = patches.Rectangle(
-            #         (xmin, ymin), rec_width, rec_height,
-            #         linewidth=1, edgecolor='b', facecolor='none')
-            #     ax.add_patch(rect)
+    def draw_kpts(self, frame, keypoints, edges, confidence_threshold):
+        """
+        This function will draw the points and lines on the frame
+            :param frame: the canvas frame, where we will draw the lines and points
+            :param keypoints: the coordinates and the confidence of each point
+            :param edges: the color and the coordinated for each line
+            :param confidence_threshold: the threshold for knowing if the confidence of a point is right
+            :return: the drawn input frame
+        """
 
-            figure.canvas.draw()
-            image_from_plot = np.frombuffer(figure.canvas.tostring_rgb(), dtype=np.uint8)
-            # image_from_plot = image_from_plot.reshape(figure.canvas.get_width_height()[::-1] + (3, ))
+        (height, width) = frame.shape[:2]
+        shaped = np.squeeze(np.multiply(keypoints, [height, width, 1]))
 
-            plt.close(figure)
+        # ------ drawing the lines -----
+        for edge, color in edges.items():
+            (p1, p2) = edge
+            (y1, x1, c1) = shaped[p1]
+            (y2, x2, c2) = shaped[p2]
 
-            if height is not None:
-                # width = int(height / height * width)
-                image_from_plot = cv2.resize(image_from_plot, (width, height), interpolation=cv2.INTER_CUBIC)
+            if c1 > confidence_threshold and c2 > confidence_threshold:
+                cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 6)
 
-            return image_from_plot
+        # ------ drawing the points -----
+        for keypoint in shaped:
+            (kpts_y, kpts_x, kpts_confidence) = keypoint
+            if kpts_confidence > confidence_threshold:
+                cv2.circle(frame, (int(kpts_x), int(kpts_y)), 8, (0, 0, 255), -1)
 
-        else:
-            Messages().error("The keypoints were not generated!")
-            return None
+
+
 
 
 class Keypoint:
@@ -141,7 +93,7 @@ class Keypoint:
     }
 
     # Maps bones to a matplotlib color name.
-    KEYPOINT_EDGE_INDS_TO_COLOR = {
+    EDGES = {
         (0, 1): 'm',
         (0, 2): 'c',
         (1, 3): 'm',
