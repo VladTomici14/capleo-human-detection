@@ -1,14 +1,18 @@
 from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
 from messages import Messages
+from typing import Tuple
 import tensorflow as tf
 from PIL import Image
 import numpy as np
+import time
 import cv2
 
-
+# TODO: start to use individual points and to calculate stuff
 # TODO: work on the style of the drawings of lines and points
 # TODO: calculate the radius of the circles and the thinckness of the lines using the picture's shapes
+# TODO: delete irrelevant packages that were imported
+
 
 class MoveNetPredictor:
 
@@ -24,14 +28,17 @@ class MoveNetPredictor:
             :return: the input image but with all the lines and points drawn
         """
 
+        # ------ preparing the image ------
         frame = image.copy()
-        frame = tf.image.resize_with_pad(np.expand_dims(frame, axis=0), input_size, input_size)
+        frame = tf.expand_dims(frame, axis=0)
+        frame = tf.image.resize_with_pad(frame, input_size, input_size)
         input_image = tf.cast(frame, dtype=tf.float32)
 
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
 
-        interpreter.set_tensor(input_details[0]["index"], np.array(input_image))
+        # FIXME: debug this weird error (when changing the model to the 4th version)
+        interpreter.set_tensor(input_details[0]['index'], input_image.numpy())
         interpreter.invoke()
         keypoints_with_scores = interpreter.get_tensor(output_details[0]["index"])
 
@@ -67,8 +74,17 @@ class MoveNetPredictor:
             if kpts_confidence > confidence_threshold:
                 cv2.circle(frame, (int(kpts_x), int(kpts_y)), 8, (0, 0, 255), -1)
 
+    def crop_camera(self, frame):
+        (height, width) = frame.shape[:2]
 
+        half_width = width // 2
 
+        (xstart, ystart) = (half_width - 540, 0)
+        (xend, yend) = (half_width + 540, 1080)
+
+        frame = frame[ystart:yend, xstart:xend]
+
+        return frame
 
 
 class Keypoint:
