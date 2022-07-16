@@ -6,30 +6,17 @@ from PIL import Image
 import tensorflow_hub
 import numpy as np
 import argparse
+import time
 import cv2
 
-input_size = 256
-
-
-# TODO: add comments and the pydocs
-# TODO: write a function which takes one cv2 frame and returns it with the lines and dots
+# TODO: add comments and the documentation
 # TODO: make sure the code supports any image format
 # TODO: add some cool gradients for the circles
-# TODO: add argument for video / image / webcam
 
-def load_model():
-    """
-    This function will load the model.
-        :return: the final model, which can be used to make predictions
-    """
-
+def load_model(model_path):
     try:
-        # ------- setting up the model path ------
-        # thunder_model_url = "https://tfhub.dev/google/movenet/singlepose/thunder/4"
-        # module = tensorflow_hub.load(thunder_model_url)
-        # interpreter = module.signatures['serving_default']
-
-        interpreter = tf.lite.Interpreter(model_path="models/lite-model_movenet_singlepose_thunder_3.tflite")
+        # TODO: test more datasets
+        interpreter = tf.lite.Interpreter(model_path=model_path)
         interpreter.allocate_tensors()
 
         Messages().success("The model was loaded")
@@ -41,100 +28,80 @@ def load_model():
         return None
 
 
-# def detect_on_image(tensor_image, model):
-#     """
-#     This function can do detection for one picture
-#         :param tensor_image: The image in a TF array supported format.
-#         :param model: The model which we want to use
-#         :return: The coordinates of the key-points if a person was found in the image.
-#                  None if no one was detected in the picture.
-#     """
-#
-#     if model is not None:
-#         input_image = tf.cast(tensor_image, dtype=tf.int32)
-#
-#         outputs = model(input_image)
-#
-#         keypoints_with_scores = outputs['output_0'].numpy()
-#
-#         return keypoints_with_scores
-#
-#     else:
-#         Messages().error("The model was not uploaded correctly!")
-#         return None
-
-
-def opencv_image_2_tensorflow(opencv_image):
-    tensor_image = tf.convert_to_tensor(opencv_image, dtype=tf.float32)
-    tensor_image = tf.expand_dims(tensor_image, 0)
-
-    return tensor_image
-
-
-def image2array(tensor_image):
-    # Resize and pad the image to keep the aspect ratio and fit the expected size.
-    input_image = tf.expand_dims(tensor_image, axis=0)
-    input_image = tf.image.resize_with_pad(input_image, input_size, input_size)
-
-    return input_image
-
-
-def load_image(image_path):
-    image = tf.io.read_file(image_path)
-    image = tf.image.decode_jpeg(image)
-
-    return image
-
-
 if __name__ == "__main__":
     # ----- argparse the input image path ------
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", default=1, help="The video source for the program (image / video / 1 for webcam)")
-    ap.add_argument("--draw", default=True, help="Do you want to draw the keypoints on the image? (True/False)")
+    ap.add_argument("--drawing", default=True, help="Do you want to draw the keypoints on the image? (True/False)")
+    ap.add_argument("--interpreter", default="models/lite-model_movenet_singlepose_thunder_3.tflite")
     args = vars(ap.parse_args())
 
-    interpreter = load_model()
+    # ------- loading the model interpreter ------
+    input_size = 256
+    interpreter_path = str(args["interpreter"])
+    interpreter = load_model(interpreter_path)
 
-    # loaded_image = load_image(args["image"])  # <class 'tensorflow.python.framework.ops.EagerTensor'>
-    # image_array = image2array(loaded_image)
-    # key_points = detect_on_image(image_array, model)
-    #
-    # print(len(key_points[0][0]))
-
+    # ------- setting up the predictor class ------
     predictor = MoveNetPredictor()
-    # if args["source"].find(".png") or args["source"].find(".jpg") or args["source"].find(".jpeg"):
-    #     image = cv2.imread(args["source"])
-    #
-    #     output_image = predictor.detect_on_image(image, interpreter, input_size, drawing=True)
-    #
-    #     while True:
-    #
-    #         cv2.imshow("output image", output_image)
-    #
-    #         if cv2.waitKey(1) == ord("q"):
-    #             break
-    #
-    # camera = cv2.VideoCapture(args["source"])
-    # while camera.isOpened():
-    #     ret, frame = camera.read()
-    #
-    #     if ret:
-    #         output_frame = predictor.detect_on_image(frame, interpreter, input_size, drawing=True)
-    #
-    #         # TODO: add fps value printing
-    #
-    #         cv2.imshow("webcam", output_frame)
-    #
-    #         if cv2.waitKey(1) == ord("q"):
-    #             break
+    previous_time = 0
 
-    # camera.release()
-    # cv2.destroyAllWindows()
+    # ------ started to do the detection for multiple input circumstances (camera / picture / video) ------
+    if args["source"] == "camera":
+        # -------- webcam detection ------
+        camera = cv2.VideoCapture(0)
+        initial_time = time.time()
 
-    image = cv2.imread(args["source"])
-    output_image = MoveNetPredictor().detect_on_image(image, interpreter, input_size, drawing=True)
-    while True:
-        cv2.imshow("output_frame", output_image)
+        while camera.isOpened():
+            ret, frame = camera.read()
+            (height, width) = frame.shape[:2]
+            cropped_camera = predictor.crop_camera(frame)
 
-        if cv2.waitKey(1) == ord("q"):
-            break
+            resized_frame = cv2.resize(frame, (input_size, input_size))
+            resized_frame = predictor.detect_on_image(resized_frame, interpreter, input_size, drawing=args["drawing"])
+            resized_frame = cv2.resize(resized_frame, (width, height))
+
+
+
+            # ------ showing FPS ------
+            fps = 1 / (time.time() - previous_time)
+            previous_time = time.time()
+            cv2.putText(cropped_camera, f"FPS: {str(int(fps))}", (30, 70), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
+
+            cv2.imshow("Resized camera", resized_frame)
+            cv2.imshow("Original camera", frame)
+            if cv2.waitKey(1) == ord("q"):
+                break
+
+        camera.release()
+
+    elif cv2.imread(args["source"]) is None:
+        # ------- the source file that was parsed is a video ------
+        video = cv2.VideoCapture(args["source"])
+        while video.isOpened():
+            ret, frame = video.read()
+
+            output_frame = predictor.detect_on_image(frame, interpreter, input_size, drawing=args["drawing"])
+
+            # ------ showing FPS ------
+            fps = 1 / (time.time() - previous_time)
+            previous_time = time.time()
+            cv2.putText(frame, f"FPS: {str(int(fps))}", (30, 70), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
+
+            # ------ showing the video -----
+            cv2.imshow("Video detection output", output_frame)
+            if cv2.waitKey(1) == ord("q"):
+                break
+
+        video.release()
+
+    else:
+        # ------ the source file that was parsed is a picture ------
+        input_image = cv2.imread(args["source"])
+
+        output_image = predictor.detect_on_image(input_image, interpreter, input_size, drawing=args["drawing"])
+        while True:
+            cv2.imshow("Picture detection output", output_image)
+            if cv2.waitKey(1) == ord("q"):
+                break
+
+    cv2.destroyAllWindows()
