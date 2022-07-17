@@ -13,21 +13,6 @@ import cv2
 # TODO: make sure the code supports any image format
 # TODO: add some cool gradients for the circles
 
-def load_model(model_path):
-    try:
-        # TODO: test more datasets
-        interpreter = tf.lite.Interpreter(model_path=model_path)
-        interpreter.allocate_tensors()
-
-        Messages().success("The model was loaded")
-
-        return interpreter
-
-    except Exception:
-        Messages().error(Exception)
-        return None
-
-
 if __name__ == "__main__":
     # ----- argparse the input image path ------
     ap = argparse.ArgumentParser()
@@ -39,7 +24,6 @@ if __name__ == "__main__":
     # ------- loading the model interpreter ------
     input_size = 256
     interpreter_path = str(args["interpreter"])
-    interpreter = load_model(interpreter_path)
 
     # ------- setting up the predictor class ------
     predictor = MoveNetPredictor()
@@ -53,27 +37,37 @@ if __name__ == "__main__":
 
         while camera.isOpened():
             ret, frame = camera.read()
-            (height, width) = frame.shape[:2]
-            cropped_camera = predictor.crop_camera(frame)
+            if ret:
+                (height, width) = frame.shape[:2]
+                cropped_camera = predictor.crop_camera(frame)
 
-            resized_frame = cv2.resize(frame, (input_size, input_size))
-            resized_frame = predictor.detect_on_image(resized_frame, interpreter, input_size, drawing=args["drawing"])
-            resized_frame = cv2.resize(resized_frame, (width, height))
+                output_frame = frame.copy()
+                output_frame = predictor.detect_on_image(output_frame, interpreter_path, input_size, drawing=args["drawing"])
 
-            angle = predictor.calculate_angle(point1=Keypoint.KEYPOINT_DICT["right_shoulder"],
-                                              connection_point=Keypoint.KEYPOINT_DICT["right_elbow"],
-                                              point2=Keypoint.KEYPOINT_DICT["right_wrist"])
+                # resized_frame = cv2.resize(frame, (input_size, input_size))
+                # resized_frame = predictor.detect_on_image(resized_frame, interpreter_path, input_size, drawing=args["drawing"])
+                # resized_frame = cv2.resize(resized_frame, (width, height))
+                #
+                # square_camera = cv2.resize(frame, (input_size, input_size))
+                # square_camera = predictor.detect_on_image(square_camera, interpreter_path, input_size, drawing=args["drawing"])
 
-            print(angle)
+                # angle = predictor.calculate_angle(point1=Keypoint.KEYPOINT_DICT["right_shoulder"],
+                #                                   connection_point=Keypoint.KEYPOINT_DICT["right_elbow"],
+                #                                   point2=Keypoint.KEYPOINT_DICT["right_wrist"])
+                #
+                # print(angle)
 
-            # ------ showing FPS ------
-            fps = 1 / (time.time() - previous_time)
-            previous_time = time.time()
-            cv2.putText(cropped_camera, f"FPS: {str(int(fps))}", (30, 70), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
+                # ------ showing FPS ------
+                fps = 1 / (time.time() - previous_time)
+                previous_time = time.time()
+                cv2.putText(cropped_camera, f"FPS: {str(int(fps))}", (30, 70), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
 
-            cv2.imshow("Resized camera", resized_frame)
-            cv2.imshow("Original camera", frame)
-            if cv2.waitKey(1) == ord("q"):
+                cv2.imshow("Original camera", output_frame)
+                # cv2.imshow("Resized camera", resized_frame)
+                # cv2.imshow("Square sized camera", square_camera)
+                if cv2.waitKey(1) == ord("q"):
+                    break
+            else:
                 break
 
         camera.release()
@@ -84,16 +78,19 @@ if __name__ == "__main__":
         while video.isOpened():
             ret, frame = video.read()
 
-            output_frame = predictor.detect_on_image(frame, interpreter, input_size, drawing=args["drawing"])
+            if ret:
+                output_frame = predictor.detect_on_image(frame, interpreter_path, input_size, drawing=args["drawing"])
 
-            # ------ showing FPS ------
-            fps = 1 / (time.time() - previous_time)
-            previous_time = time.time()
-            cv2.putText(frame, f"FPS: {str(int(fps))}", (30, 70), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
+                # ------ showing FPS ------
+                fps = 1 / (time.time() - previous_time)
+                previous_time = time.time()
+                cv2.putText(frame, f"FPS: {str(int(fps))}", (30, 70), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
 
-            # ------ showing the video -----
-            cv2.imshow("Video detection output", output_frame)
-            if cv2.waitKey(1) == ord("q"):
+                # ------ showing the video -----
+                cv2.imshow("Video detection output", output_frame)
+                if cv2.waitKey(1) == ord("q"):
+                    break
+            else:
                 break
 
         video.release()
@@ -102,7 +99,7 @@ if __name__ == "__main__":
         # ------ the source file that was parsed is a picture ------
         input_image = cv2.imread(args["source"])
 
-        output_image = predictor.detect_on_image(input_image, interpreter, input_size, drawing=args["drawing"])
+        output_image = predictor.detect_on_image(input_image, interpreter_path, input_size, drawing=args["drawing"])
 
         angle = predictor.calculate_angle(point1=Keypoint.KEYPOINT_DICT["right_shoulder"],
                                           connection_point=Keypoint.KEYPOINT_DICT["right_elbow"],
