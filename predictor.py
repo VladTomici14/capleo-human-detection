@@ -23,7 +23,7 @@ class MoveNetPredictor:
     def __init__(self):
         self.keypoint = Keypoint()
 
-    def detect_on_image(self, image, interpreter, input_size, drawing=True):
+    def detect_on_image(self, image, model_path, input_size, drawing=True):
         """
         This function will return the model keypoints for an image
             :param image: the image that we want to do the detection on
@@ -32,10 +32,15 @@ class MoveNetPredictor:
             :return: the input image but with all the lines and points drawn
         """
 
+        # ------ loading the interpreter ------
+        interpreter = tf.lite.Interpreter(model_path=model_path)
+        interpreter.allocate_tensors()
+
         # ------ preparing the image ------
-        frame = image.copy()
+        # frame = image.copy()
+        frame = cv2.resize(image, (input_size, input_size))
         frame = tf.expand_dims(frame, axis=0)
-        frame = tf.image.resize_with_pad(frame, input_size, input_size)
+        # frame = tf.image.resize_with_pad(frame, input_size, input_size)
         input_image = tf.cast(frame, dtype=tf.float32)
 
         input_details = interpreter.get_input_details()
@@ -94,9 +99,9 @@ class MoveNetPredictor:
         length1c = self.distance_2_points(point1, connection_point)
         length2c = self.distance_2_points(point2, connection_point)
 
-        print(f"length12: {length12}")
-        print(f"length1c: {length1c}")
-        print(f"length2c: {length2c}")
+        # print(f"length12: {length12}")
+        # print(f"length1c: {length1c}")
+        # print(f"length2c: {length2c}")
 
         semi_perimeter = int((length12 + length2c + length1c) / 2)
 
