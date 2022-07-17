@@ -1,3 +1,5 @@
+import math
+
 from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
 from messages import Messages
@@ -6,7 +8,9 @@ import tensorflow as tf
 from PIL import Image
 import numpy as np
 import time
+import math
 import cv2
+
 
 # TODO: start to use individual points and to calculate stuff
 # TODO: work on the style of the drawings of lines and points
@@ -56,23 +60,55 @@ class MoveNetPredictor:
             :return: the drawn input frame
         """
 
-        (height, width) = frame.shape[:2]
-        shaped = np.squeeze(np.multiply(keypoints, [height, width, 1]))
+        (self.height, self.width) = frame.shape[:2]
+        self.shaped = np.squeeze(np.multiply(keypoints, [self.height, self.width, 1]))
 
         # ------ drawing the lines -----
         for edge, color in edges.items():
             (p1, p2) = edge
-            (y1, x1, c1) = shaped[p1]
-            (y2, x2, c2) = shaped[p2]
+            (y1, x1, c1) = self.shaped[p1]
+            (y2, x2, c2) = self.shaped[p2]
 
             if c1 > confidence_threshold and c2 > confidence_threshold:
                 cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 6)
 
         # ------ drawing the points -----
-        for keypoint in shaped:
+        for keypoint in self.shaped:
             (kpts_y, kpts_x, kpts_confidence) = keypoint
             if kpts_confidence > confidence_threshold:
                 cv2.circle(frame, (int(kpts_x), int(kpts_y)), 8, (0, 0, 255), -1)
+
+    def distance_2_points(self, point1, point2):
+        (y1, x1, c1) = self.shaped[point1]
+        (y2, x2, c2) = self.shaped[point2]
+
+        length = float(math.sqrt(math.pow(x2 - x1, 2) + math.pow(y2 - y1, 2)))
+
+        return float(length)
+
+    def calculate_angle(self, point1, connection_point, point2):
+
+        # TODO: implement collinearity condition
+
+        length12 = self.distance_2_points(point1, point2)
+        length1c = self.distance_2_points(point1, connection_point)
+        length2c = self.distance_2_points(point2, connection_point)
+
+        print(f"length12: {length12}")
+        print(f"length1c: {length1c}")
+        print(f"length2c: {length2c}")
+
+        semi_perimeter = int((length12 + length2c + length1c) / 2)
+
+        area = semi_perimeter * (semi_perimeter - length12) * (semi_perimeter - length1c) * (semi_perimeter - length2c)
+        if area < 0:
+            return None
+        else:
+            area = math.sqrt(area)
+            angle = math.asin((area * 2) / (length1c * length2c))
+            angle = angle * 180 / math.pi
+
+            return angle
 
     def crop_camera(self, frame):
         (height, width) = frame.shape[:2]
