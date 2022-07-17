@@ -1,4 +1,4 @@
-from predictor import MoveNetPredictor
+from predictor import MoveNetPredictor, Keypoint
 from matplotlib import pyplot as plt
 from messages import Messages
 import tensorflow as tf
@@ -60,7 +60,11 @@ if __name__ == "__main__":
             resized_frame = predictor.detect_on_image(resized_frame, interpreter, input_size, drawing=args["drawing"])
             resized_frame = cv2.resize(resized_frame, (width, height))
 
+            angle = predictor.calculate_angle(point1=Keypoint.KEYPOINT_DICT["right_shoulder"],
+                                              connection_point=Keypoint.KEYPOINT_DICT["right_elbow"],
+                                              point2=Keypoint.KEYPOINT_DICT["right_wrist"])
 
+            print(angle)
 
             # ------ showing FPS ------
             fps = 1 / (time.time() - previous_time)
@@ -99,6 +103,13 @@ if __name__ == "__main__":
         input_image = cv2.imread(args["source"])
 
         output_image = predictor.detect_on_image(input_image, interpreter, input_size, drawing=args["drawing"])
+
+        angle = predictor.calculate_angle(point1=Keypoint.KEYPOINT_DICT["right_shoulder"],
+                                          connection_point=Keypoint.KEYPOINT_DICT["right_elbow"],
+                                          point2=Keypoint.KEYPOINT_DICT["right_wrist"])
+
+        print(angle)
+
         while True:
             cv2.imshow("Picture detection output", output_image)
             if cv2.waitKey(1) == ord("q"):
