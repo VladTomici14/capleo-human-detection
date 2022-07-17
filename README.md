@@ -3,7 +3,8 @@
 # Issues
 
 
-### <li> 16th July 2022, 9:45 PM 
+
+## <li><span style="color:#7CFC00"> 16th July 2022, 9:45 PM - SOLVED</span> ✅
 
 We have some problems with drawing on the image. The MoveNet model supports only square images apparently.
 
