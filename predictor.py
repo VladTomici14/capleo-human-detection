@@ -6,7 +6,7 @@ from utils.colors import BGRColors
 
 # TODO: work on the style of the drawings of lines and points
 # TODO: calculate the radius of the circles and the thinckness of the lines using the picture's shapes
-
+# TODO: add confidence threshold to any thing
 
 class MoveNetPredictor:
 
@@ -68,7 +68,7 @@ class MoveNetPredictor:
             (y2, x2, c2) = self.shaped[p2]
 
             if c1 > confidence_threshold and c2 > confidence_threshold:
-                cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 6)
+                cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 6)
 
         # ------ drawing the points -----
         k = 0
@@ -81,27 +81,27 @@ class MoveNetPredictor:
                         # ------- printing the angle values between the points that we want to use -----
                         for points in self.keypoint.ANGLES:
                             self.draw_angle_kpts(frame, points)
-                            print(Geometry(self.shaped).calculate_angle([point for point in points]))
+                            angle = 180 - Geometry(self.shaped).calculate_angle([point for point in points])
+                            print(f"{points}: {angle}")
+                            if 135 <= angle <= 180:
+                                (y1, x1) = self.shaped[points[0]][:2]
+                                (y2, x2) = self.shaped[points[2]][:2]
+                                (yc, xc) = self.shaped[points[1]][:2]
 
-                        cv2.circle(frame, (int(kpts_x), int(kpts_y)), 8, BGRColors().BLUE, -1)
+                                cv2.line(frame, (int(x1), int(y1)), (int(xc), int(yc)), BGRColors().GREEN, 8)
+                                cv2.line(frame, (int(x2), int(y2)), (int(xc), int(yc)), BGRColors().GREEN, 8)
+
                 else:
+                    head_2_body_angle = Geometry(self.shaped).head_to_body_angle()
+                    print(f"head 2 body angle: {head_2_body_angle}")
                     cv2.circle(frame, (int(kpts_x), int(kpts_y)), 8, BGRColors().RED, -1)
 
                 k += 1
 
     def draw_angle_kpts(self, image, points):
-        # ----------- preparing the coordinates of the points ------
-        index_point1 = points[0]
-        index_connection_point = points[1]
-        index_point2 = points[2]
-
-        (y1, x1) = self.shaped[index_point1][:2]
-        (yc, xc) = self.shaped[index_connection_point][:2]
-        (y2, x2) = self.shaped[index_point2][:2]
-
         for index in points:
             (y, x) = self.shaped[index][:2]
-            cv2.circle(image, (x, y), 8, BGRColors().YELLOW, -1)
+            cv2.circle(image, (int(x), int(y)), 8, BGRColors().YELLOW, -1)
 
 
 class Keypoint:
@@ -127,26 +127,29 @@ class Keypoint:
 
     # Maps bones to a matplotlib color name.
     EDGES = {
-        (0, 1): 'm',
-        (0, 2): 'c',
-        (1, 3): 'm',
-        (2, 4): 'c',
-        (0, 5): 'm',
-        (0, 6): 'c',
-        (5, 7): 'm',
-        (7, 9): 'm',
-        (6, 8): 'c',
-        (8, 10): 'c',
-        (5, 6): 'y',
-        (5, 11): 'm',
-        (6, 12): 'c',
-        (11, 12): 'y',
-        (11, 13): 'm',
-        (13, 15): 'm',
-        (12, 14): 'c',
-        (14, 16): 'c'
+        (0, 1): BGRColors().PINK,
+        (0, 2): BGRColors().PINK,
+        (1, 3): BGRColors().PINK,
+        (2, 4): BGRColors().PINK,
+        (0, 5): BGRColors().GREEN,
+        (0, 6): BGRColors().GREEN,
+        (5, 7): BGRColors().ORANGE,
+        (7, 9): BGRColors().ORANGE,
+        (6, 8): BGRColors().YELLOW,
+        (8, 10): BGRColors().YELLOW,
+        (5, 6): BGRColors().GREEN,
+        (5, 11): BGRColors().GREEN,
+        (6, 12): BGRColors().GREEN,
+        (11, 12): BGRColors().GREEN,
+        (11, 13): BGRColors().CYAN,
+        (13, 15): BGRColors().CYAN,
+        (12, 14): BGRColors().PURPLE,
+        (14, 16): BGRColors().PURPLE
     }
 
     ANGLES = [
-
+        [6, 8, 10],    # the right elbow angle joints
+        [5, 7, 9],     # the left elbow angle joints
+        [12, 14, 16],  # the right knee angle joints
+        [11, 13, 15]   # the left knee angle joints
     ]
