@@ -1,67 +1,60 @@
-import math
-
-from matplotlib.collections import LineCollection
-import matplotlib.pyplot as plt
-from messages import Messages
-from typing import Tuple
 import tensorflow as tf
-from PIL import Image
 import numpy as np
-import time
-import math
 import cv2
+from utils.angles import Geometry
+from utils.colors import BGRColors
 
-
-# TODO: start to use individual points and to calculate stuff
 # TODO: work on the style of the drawings of lines and points
 # TODO: calculate the radius of the circles and the thinckness of the lines using the picture's shapes
-# TODO: delete irrelevant packages that were imported
 
 
 class MoveNetPredictor:
 
-    def __init__(self):
+    def __init__(self, model_path, input_size):
+        self.shaped = None
         self.keypoint = Keypoint()
+        self.input_size = input_size
 
-    def detect_on_image(self, image, model_path, input_size, drawing=True):
+        # ------ loading the model ------
+        self.interpreter = tf.lite.Interpreter(model_path=model_path)
+        self.interpreter.allocate_tensors()
+
+    def detect_on_image(self, image, drawing=True, angles=True):
         """
         This function will return the model keypoints for an image
             :param image: the image that we want to do the detection on
-            :param interpreter: the interpreter that we want to use for the detection
             :param drawing: the condition if we want to draw on the image that was used as an argument
+            :param angles: the condition if we want to show the angles values
             :return: the input image but with all the lines and points drawn
         """
 
-        # ------ loading the interpreter ------
-        interpreter = tf.lite.Interpreter(model_path=model_path)
-        interpreter.allocate_tensors()
-
         # ------ preparing the image ------
-        # frame = image.copy()
-        frame = cv2.resize(image, (input_size, input_size))
+        frame = cv2.resize(image, (self.input_size, self.input_size))
         frame = tf.expand_dims(frame, axis=0)
-        # frame = tf.image.resize_with_pad(frame, input_size, input_size)
         input_image = tf.cast(frame, dtype=tf.float32)
 
-        input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
+        input_details = self.interpreter.get_input_details()
+        output_details = self.interpreter.get_output_details()
 
         # FIXME: debug this weird error (when changing the model to the 4th version)
-        interpreter.set_tensor(input_details[0]['index'], input_image.numpy())
-        interpreter.invoke()
-        keypoints_with_scores = interpreter.get_tensor(output_details[0]["index"])
+        self.interpreter.set_tensor(input_details[0]['index'], input_image.numpy())
+        self.interpreter.invoke()
+        keypoints_with_scores = self.interpreter.get_tensor(output_details[0]["index"])
 
-        self.draw_kpts(image, keypoints_with_scores, self.keypoint.EDGES, confidence_threshold=0.3)
+        # ---- drawing the keypoints on the image -----
+        if drawing is True:
+            self.draw_kpts(image, keypoints_with_scores, self.keypoint.EDGES, 0.3, angles)
 
         return image
 
-    def draw_kpts(self, frame, keypoints, edges, confidence_threshold):
+    def draw_kpts(self, frame, keypoints, edges, confidence_threshold, calculate_angles):
         """
         This function will draw the points and lines on the frame
             :param frame: the canvas frame, where we will draw the lines and points
             :param keypoints: the coordinates and the confidence of each point
             :param edges: the color and the coordinated for each line
             :param confidence_threshold: the threshold for knowing if the confidence of a point is right
+            :param calculate_angles: the condition if we want to show the angles values
             :return: the drawn input frame
         """
 
@@ -78,54 +71,37 @@ class MoveNetPredictor:
                 cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 6)
 
         # ------ drawing the points -----
+        k = 0
         for keypoint in self.shaped:
             (kpts_y, kpts_x, kpts_confidence) = keypoint
             if kpts_confidence > confidence_threshold:
-                cv2.circle(frame, (int(kpts_x), int(kpts_y)), 8, (0, 0, 255), -1)
 
-    def distance_2_points(self, point1, point2):
-        (y1, x1, c1) = self.shaped[point1]
-        (y2, x2, c2) = self.shaped[point2]
+                if calculate_angles is True:
+                    if k == 9:
+                        # ------- printing the angle values between the points that we want to use -----
+                        for points in self.keypoint.ANGLES:
+                            self.draw_angle_kpts(frame, points)
+                            print(Geometry(self.shaped).calculate_angle([point for point in points]))
 
-        length = float(math.sqrt(math.pow(x2 - x1, 2) + math.pow(y2 - y1, 2)))
+                        cv2.circle(frame, (int(kpts_x), int(kpts_y)), 8, BGRColors().BLUE, -1)
+                else:
+                    cv2.circle(frame, (int(kpts_x), int(kpts_y)), 8, BGRColors().RED, -1)
 
-        return float(length)
+                k += 1
 
-    def calculate_angle(self, point1, connection_point, point2):
+    def draw_angle_kpts(self, image, points):
+        # ----------- preparing the coordinates of the points ------
+        index_point1 = points[0]
+        index_connection_point = points[1]
+        index_point2 = points[2]
 
-        # TODO: implement collinearity condition
+        (y1, x1) = self.shaped[index_point1][:2]
+        (yc, xc) = self.shaped[index_connection_point][:2]
+        (y2, x2) = self.shaped[index_point2][:2]
 
-        length12 = self.distance_2_points(point1, point2)
-        length1c = self.distance_2_points(point1, connection_point)
-        length2c = self.distance_2_points(point2, connection_point)
-
-        # print(f"length12: {length12}")
-        # print(f"length1c: {length1c}")
-        # print(f"length2c: {length2c}")
-
-        semi_perimeter = int((length12 + length2c + length1c) / 2)
-
-        area = semi_perimeter * (semi_perimeter - length12) * (semi_perimeter - length1c) * (semi_perimeter - length2c)
-        if area < 0:
-            return None
-        else:
-            area = math.sqrt(area)
-            angle = math.asin((area * 2) / (length1c * length2c))
-            angle = angle * 180 / math.pi
-
-            return angle
-
-    def crop_camera(self, frame):
-        (height, width) = frame.shape[:2]
-
-        half_width = width // 2
-
-        (xstart, ystart) = (half_width - 540, 0)
-        (xend, yend) = (half_width + 540, 1080)
-
-        frame = frame[ystart:yend, xstart:xend]
-
-        return frame
+        for index in points:
+            (y, x) = self.shaped[index][:2]
+            cv2.circle(image, (x, y), 8, BGRColors().YELLOW, -1)
 
 
 class Keypoint:
@@ -170,3 +146,7 @@ class Keypoint:
         (12, 14): 'c',
         (14, 16): 'c'
     }
+
+    ANGLES = [
+
+    ]
