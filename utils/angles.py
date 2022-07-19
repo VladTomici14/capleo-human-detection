@@ -1,6 +1,6 @@
 import math
 from utils.messages import Messages
-
+import cv2
 
 class Geometry:
     def __init__(self, shaped):
@@ -82,6 +82,30 @@ class Geometry:
             return True
 
         return False
+
+    def head_to_body_angle(self):
+        (yr, xr) = self.keypoints[2][:2]  # the right eye keypoint coordinates
+        (yl, xl) = self.keypoints[1][:2]  # the left eye keypoint coordinates
+
+        mrl = self.slope_2_points((xr, yr), (xl, yl))
+        mp = -1 / mrl
+
+        (yr_shoulder, xr_shoulder) = self.keypoints[6][:2]
+        (yl_shoulder, xl_shoulder) = self.keypoints[5][:2]
+        m_shoulders = self.slope_2_points((xr_shoulder, yr_shoulder), (xl_shoulder, yl_shoulder))
+
+        # TODO: draw the vertical face line
+        # FIXME: maybe an implementation of values which are divisible by 5
+        # ------- calculating the angle -------
+        angle_radians = math.atan((mp - m_shoulders) / (1 + (mp * m_shoulders)))
+        angle_radians = math.fabs(angle_radians)
+        angle_degrees = math.degrees(angle_radians)
+        angle_degrees = Algebra().float_to_x_decimals(angle_degrees, 2)
+
+        if 88.0 <= angle_degrees <= 92.0:
+            angle_degrees = 90.0
+
+        return angle_degrees
 
 class Algebra:
 
