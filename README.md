@@ -10,8 +10,6 @@ We have some problems with drawing on the image. The MoveNet model supports only
 
 So to fix this, we should have some resizes, but this may decrease the quality of the image in a major way (see the picture below).
 
-![screenshot of the problem](screenshot-problem.png)
-
 Potential ways to fix this: 
 - scale the images using the padding
 - scale up the coordinates of the dots - basically translate the dots coordinates for the big picture
