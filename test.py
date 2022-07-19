@@ -1,10 +1,9 @@
+import math
 
-n = int(input("n: "))
-m = int(input("m: "))
+n = float(input("enter a float: '"))
+decimals = int(input("number of decimals: "))
 
-while(m != 0):
-    r = n % m
-    n = m
-    m = r
+n = int(n * math.pow(10, decimals))
+n = float(n / math.pow(10, decimals))
 
 print(n)
