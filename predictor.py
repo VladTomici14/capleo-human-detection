@@ -4,9 +4,7 @@ import cv2
 from utils.angles import Geometry
 from utils.colors import BGRColors
 
-# TODO: work on the style of the drawings of lines and points
-# TODO: calculate the radius of the circles and the thinckness of the lines using the picture's shapes
-# TODO: add confidence threshold to any thing
+# TODO: fix the arm bug when calculating angle
 
 class MoveNetPredictor:
 
@@ -18,6 +16,11 @@ class MoveNetPredictor:
         # ------ loading the model ------
         self.interpreter = tf.lite.Interpreter(model_path=model_path)
         self.interpreter.allocate_tensors()
+
+        # ----- parameters for the stylizing of the text, lines and keypoints -----
+        self.circle_radius = 8
+        self.line_thickness = 6
+        self.text_thickness = 1
 
     def detect_on_image(self, image, drawing=True, angles=True):
         """
@@ -36,7 +39,6 @@ class MoveNetPredictor:
         input_details = self.interpreter.get_input_details()
         output_details = self.interpreter.get_output_details()
 
-        # FIXME: debug this weird error (when changing the model to the 4th version)
         self.interpreter.set_tensor(input_details[0]['index'], input_image.numpy())
         self.interpreter.invoke()
         keypoints_with_scores = self.interpreter.get_tensor(output_details[0]["index"])
@@ -46,6 +48,18 @@ class MoveNetPredictor:
             self.draw_kpts(image, keypoints_with_scores, self.keypoint.EDGES, 0.3, angles)
 
         return image
+
+    def active_keypoints(self, confidence_threshold):
+        k = 0
+        for pair_of_index in self.keypoint.ANGLES:
+            for point_index in pair_of_index:
+                (kpts_y, kpts_x, kpts_confidence) = self.shaped[point_index]
+                if kpts_confidence > confidence_threshold:
+                    k += 1
+
+        if k == 12:
+            return True
+        return False
 
     def draw_kpts(self, frame, keypoints, edges, confidence_threshold, calculate_angles):
         """
@@ -68,40 +82,51 @@ class MoveNetPredictor:
             (y2, x2, c2) = self.shaped[p2]
 
             if c1 > confidence_threshold and c2 > confidence_threshold:
-                cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 6)
+                cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, self.line_thickness)
 
         # ------ drawing the points -----
-        k = 0
         for keypoint in self.shaped:
             (kpts_y, kpts_x, kpts_confidence) = keypoint
             if kpts_confidence > confidence_threshold:
+                if calculate_angles is True and self.active_keypoints(confidence_threshold) is True:
+                    # ------- printing the angle values between the points that we want to use -----
+                    for points in self.keypoint.ANGLES:
+                        # self.draw_angle_kpts(frame, points)
+                        angle = 180 - Geometry(self.shaped).calculate_angle([point for point in points])
 
-                if calculate_angles is True:
-                    if k == 9:
-                        # ------- printing the angle values between the points that we want to use -----
-                        for points in self.keypoint.ANGLES:
-                            self.draw_angle_kpts(frame, points)
-                            angle = 180 - Geometry(self.shaped).calculate_angle([point for point in points])
-                            print(f"{points}: {angle}")
-                            if 135 <= angle <= 180:
-                                (y1, x1) = self.shaped[points[0]][:2]
-                                (y2, x2) = self.shaped[points[2]][:2]
-                                (yc, xc) = self.shaped[points[1]][:2]
+                        # -------- preparing the points coordinates -------
+                        (y1, x1) = self.shaped[points[0]][:2]
+                        (y2, x2) = self.shaped[points[2]][:2]
+                        (yc, xc) = self.shaped[points[1]][:2]
 
-                                cv2.line(frame, (int(x1), int(y1)), (int(xc), int(yc)), BGRColors().GREEN, 8)
-                                cv2.line(frame, (int(x2), int(y2)), (int(xc), int(yc)), BGRColors().GREEN, 8)
+                        used_color = BGRColors().DARKRED
+                        if 135 <= angle <= 180:
+                            cv2.line(frame, (int(x1), int(y1)), (int(xc), int(yc)), BGRColors().GREEN, self.line_thickness)
+                            cv2.line(frame, (int(x2), int(y2)), (int(xc), int(yc)), BGRColors().GREEN, self.line_thickness)
+                            used_color = BGRColors().PINK
 
-                else:
+                        # --------- writing the angle value on the frame ------
+                        cv2.putText(frame, str(int(angle)), (int(xc) - 20, int(yc) - 40), cv2.FONT_HERSHEY_SIMPLEX, self.text_thickness, used_color, 3)
+
+                    # ------- calculating the angle between the head and the body -----
                     head_2_body_angle = Geometry(self.shaped).head_to_body_angle()
-                    print(f"head 2 body angle: {head_2_body_angle}")
-                    cv2.circle(frame, (int(kpts_x), int(kpts_y)), 8, BGRColors().RED, -1)
+                    (xm, ym) = ((self.shaped[5][1] + self.shaped[6][1]) // 2,
+                                (self.shaped[5][0] + self.shaped[6][0]) // 2)
 
-                k += 1
+                    if 60 <= head_2_body_angle <= 90:
+                        used_color = BGRColors().PINK
+                    else:
+                        used_color = BGRColors().DARKRED
 
-    def draw_angle_kpts(self, image, points):
-        for index in points:
-            (y, x) = self.shaped[index][:2]
-            cv2.circle(image, (int(x), int(y)), 8, BGRColors().YELLOW, -1)
+                    # --------- writing the head to body angle near the head ------
+                    cv2.putText(frame, str(int(head_2_body_angle)), (int(xm) - 20, int(ym) - 40), cv2.FONT_HERSHEY_SIMPLEX, self.text_thickness, used_color, 3)
+
+        # ------ redrawing the dots on the lines ------
+        for keypoint in self.shaped:
+            (kpts_y, kpts_x, kpts_confidence) = keypoint
+            if kpts_confidence > confidence_threshold:
+                cv2.circle(frame, (int(kpts_x), int(kpts_y)), self.circle_radius, BGRColors().RED, -1)
+
 
 
 class Keypoint:
@@ -127,19 +152,19 @@ class Keypoint:
 
     # Maps bones to a matplotlib color name.
     EDGES = {
-        (0, 1): BGRColors().PINK,
-        (0, 2): BGRColors().PINK,
-        (1, 3): BGRColors().PINK,
-        (2, 4): BGRColors().PINK,
-        (0, 5): BGRColors().GREEN,
-        (0, 6): BGRColors().GREEN,
-        (5, 7): BGRColors().ORANGE,
-        (7, 9): BGRColors().ORANGE,
-        (6, 8): BGRColors().YELLOW,
-        (8, 10): BGRColors().YELLOW,
-        (5, 6): BGRColors().GREEN,
-        (5, 11): BGRColors().GREEN,
-        (6, 12): BGRColors().GREEN,
+        (0, 1):   BGRColors().GREEN,
+        (0, 2):   BGRColors().GREEN,
+        (1, 3):   BGRColors().GREEN,
+        (2, 4):   BGRColors().GREEN,
+        (0, 5):   BGRColors().GREEN,
+        (0, 6):   BGRColors().GREEN,
+        (5, 7):   BGRColors().ORANGE,
+        (7, 9):   BGRColors().ORANGE,
+        (6, 8):   BGRColors().YELLOW,
+        (8, 10):  BGRColors().YELLOW,
+        (5, 6):   BGRColors().GREEN,
+        (5, 11):  BGRColors().GREEN,
+        (6, 12):  BGRColors().GREEN,
         (11, 12): BGRColors().GREEN,
         (11, 13): BGRColors().CYAN,
         (13, 15): BGRColors().CYAN,
