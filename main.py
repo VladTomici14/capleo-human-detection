@@ -3,9 +3,6 @@ import argparse
 import time
 import cv2
 
-# TODO: make sure the code supports any image/video format
-# TODO: add some cool gradients for the circles
-
 if __name__ == "__main__":
     # ----- argparse the input image path ------
     ap = argparse.ArgumentParser()
