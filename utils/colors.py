@@ -8,3 +8,6 @@ class BGRColors:
     PURPLE = (252, 20, 140)
     ORANGE = (53, 121, 242)
     PINK = (242, 5, 250)
+    DARKGREEN = (91, 166, 38)
+    DARKRED = (27, 40, 150)
+    DARKBLUE = (245, 16, 95)
