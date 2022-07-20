@@ -36,17 +36,17 @@ class Geometry:
             angle_radians = math.fabs(angle_radians)
             angle_degrees = math.degrees(angle_radians)
             angle_degrees = Algebra().float_to_x_decimals(angle_degrees, 2)
+            rounded_angle = self.round_by_base(int(angle_degrees), 5)
 
             # ------ making some adjustments --------
             are_points_collinear = self.collinearity_condition(self.keypoints[index_point1],
                                                                self.keypoints[index_point2],
                                                                self.keypoints[index_connection_point])
-            if 89 <= angle_degrees <= 91:
-                angle_degrees = 90
-            if 179 <= angle_degrees <= 2 or are_points_collinear is True:
-                angle_degrees = 0
 
-            return int(angle_degrees)
+            if 177 <= angle_degrees <= 3 or are_points_collinear is True:
+                rounded_angle = 0
+
+            return int(rounded_angle)
 
     def slope_2_points(self, point1, point2):
         """
@@ -94,18 +94,17 @@ class Geometry:
         (yl_shoulder, xl_shoulder) = self.keypoints[5][:2]
         m_shoulders = self.slope_2_points((xr_shoulder, yr_shoulder), (xl_shoulder, yl_shoulder))
 
-        # TODO: draw the vertical face line
-        # FIXME: maybe an implementation of values which are divisible by 5
         # ------- calculating the angle -------
         angle_radians = math.atan((mp - m_shoulders) / (1 + (mp * m_shoulders)))
         angle_radians = math.fabs(angle_radians)
         angle_degrees = math.degrees(angle_radians)
         angle_degrees = Algebra().float_to_x_decimals(angle_degrees, 2)
+        rounded_angle = self.round_by_base(int(angle_degrees), 5)
 
-        if 88.0 <= angle_degrees <= 92.0:
-            angle_degrees = 90.0
+        return rounded_angle
 
-        return angle_degrees
+    def round_by_base(self, number, base=5):
+        return base * round(number / base)
 
 class Algebra:
 
