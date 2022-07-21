@@ -4,10 +4,8 @@ import cv2
 from utils.angles import Geometry
 from utils.colors import BGRColors
 
-# TODO: fix the arm bug when calculating angle
 
 class MoveNetPredictor:
-
     def __init__(self, model_path, input_size):
         self.shaped = None
         self.keypoint = Keypoint()
