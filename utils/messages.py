@@ -18,6 +18,8 @@ class Messages:
     def warning(self, message):
         print(f"{self.emojis.warning}{self.font_colors.WARNING} WARNING: {message} {self.font_colors.END} ")
 
+    def loading(self, message):
+        print(f"{self.emojis.hourglass_not_done}{self.font_colors.WARNING} [INFO] {message} {self.font_colors.END}")
 
 class FontColors:
     HEADER = '\033[95m'
@@ -37,3 +39,4 @@ class Emojis:
     check_mark_button = emoji.emojize(":check_mark_button:")  # ✅
     warning = emoji.emojize(":warning:")  # ⚠️
     eyes = emoji.emojize(":eyes:")  # 👀
+    hourglass_not_done = emoji.emojize(":hourglass_not_done:")
