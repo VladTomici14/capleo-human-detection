@@ -2,6 +2,7 @@ from predictor import MoveNetPredictor
 import argparse
 import time
 import cv2
+from utils.messages import Messages
 
 if __name__ == "__main__":
     # ----- argparse the input image path ------
@@ -23,12 +24,15 @@ if __name__ == "__main__":
     # ------ started to do the detection for multiple input circumstances (camera / picture / video) ------
     if args["source"] == "camera":
         # -------- webcam detection ------
+        Messages().loading("Loading the camera...")
+        time.sleep(1)
         camera = cv2.VideoCapture(0)
 
         # ------- setting up the timer for showing FPS -----
         initial_time = time.time()
 
         # ------- reading from the camera frame by frame -----
+        Messages().success("Loaded the camera!")
         while camera.isOpened():
             ret, frame = camera.read()
             if ret:
@@ -45,6 +49,7 @@ if __name__ == "__main__":
                 # ------ showing the camera feed with the results drawn -----
                 cv2.imshow("Camera detection output", output_frame)
                 if cv2.waitKey(1) == ord("q"):
+                    Messages().warning("The program was stopped by the user!")
                     break
             else:
                 break
@@ -53,9 +58,12 @@ if __name__ == "__main__":
 
     elif cv2.imread(args["source"]) is None:
         # ------- the source file that was parsed is a video ------
+        Messages().warning("[INFO] Loading the video...")
+        time.sleep(1)
         video = cv2.VideoCapture(args["source"])
 
         # -------- opening the video frame by frame -------
+        Messages().success("Loaded the video!")
         while video.isOpened():
             ret, frame = video.read()
             if ret:
@@ -70,6 +78,7 @@ if __name__ == "__main__":
                 # ------ showing the video with the drawn results -----
                 cv2.imshow("Video detection output", output_frame)
                 if cv2.waitKey(1) == ord("q"):
+                    Messages().warning("The program was stopped by the user!")
                     break
             else:
                 break
@@ -78,15 +87,19 @@ if __name__ == "__main__":
 
     else:
         # ------ the source file that was parsed is a picture ------
+        Messages().warning("[INFO] Loading the image...")
+        time.sleep(1)
         input_image = cv2.imread(args["source"])
 
         # ------- making the detection -----
         output_image = predictor.detect_on_image(input_image, args["drawing"], args["angles"])
 
         # ------ showing the image with the results drawn -------
+        Messages().success("Loaded the image!")
         while True:
             cv2.imshow("Picture detection output", output_image)
             if cv2.waitKey(1) == ord("q"):
+                Messages().warning("The program was stopped by the user!")
                 break
 
     cv2.destroyAllWindows()
