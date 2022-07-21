@@ -38,9 +38,13 @@ It also, calculates the angles of elbows, knees and the angle of the head with t
 **The model is not intended for detecting poses of multiple people in the image**
 
 ## Body detection on videos
-<img src="docs/demo-video.gif" />
+See YouTube video 👇
+[![YOUTUBE VIDEO](https://img.youtube.com/vi/y9n2ofjYWtE/0.jpg)](https://www.youtube.com/watch?v=y9n2ofjYWtE)
 
 ## Body detection on pictures
 <img src="docs/messi-training-screenshot.png" width="400" />
-<img src="docs/demo-picture.gif"/>
+
+See YouTube video 👇
+[![YOUTUBE VIDEO](https://img.youtube.com/vi/2j60pttFOgc/0.jpg)](https://www.youtube.com/watch?v=2j60pttFOgc)
+
 
