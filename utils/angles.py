@@ -2,9 +2,11 @@ import math
 from utils.messages import Messages
 import cv2
 
+
 class Geometry:
     def __init__(self, shaped):
         self.keypoints = shaped
+        self.algebra = Algebra()
 
     def calculate_angle(self, points):
         """
@@ -36,7 +38,7 @@ class Geometry:
             angle_radians = math.fabs(angle_radians)
             angle_degrees = math.degrees(angle_radians)
             angle_degrees = Algebra().float_to_x_decimals(angle_degrees, 2)
-            rounded_angle = self.round_by_base(int(angle_degrees), 5)
+            rounded_angle = self.algebra.round_by_base(int(angle_degrees), 5)
 
             # ------ making some adjustments --------
             are_points_collinear = self.collinearity_condition(self.keypoints[index_point1],
@@ -84,6 +86,11 @@ class Geometry:
         return False
 
     def head_to_body_angle(self):
+        """
+        This function calculates the angle between the head and the body
+            :return: the head to body angle in degrees (base 5)
+        """
+
         (yr, xr) = self.keypoints[2][:2]  # the right eye keypoint coordinates
         (yl, xl) = self.keypoints[1][:2]  # the left eye keypoint coordinates
 
@@ -99,15 +106,14 @@ class Geometry:
         angle_radians = math.fabs(angle_radians)
         angle_degrees = math.degrees(angle_radians)
         angle_degrees = Algebra().float_to_x_decimals(angle_degrees, 2)
-        rounded_angle = self.round_by_base(int(angle_degrees), 5)
+        rounded_angle = self.algebra.round_by_base(int(angle_degrees), 5)
 
         return rounded_angle
 
-    def round_by_base(self, number, base=5):
-        return base * round(number / base)
+
+
 
 class Algebra:
-
     def float_to_x_decimals(self, number, x):
         """
         This functions helps in writing float numbers with a determined number of decimals after the comma
@@ -120,3 +126,6 @@ class Algebra:
         number = float(number / math.pow(10, x))
 
         return number
+
+    def round_by_base(self, number, base=5):
+        return base * round(number / base)
