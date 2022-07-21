@@ -50,6 +50,12 @@ class MoveNetPredictor:
         return image
 
     def active_keypoints(self, confidence_threshold):
+        """
+        This function verifies if keypoints of the body are detected
+            :param confidence_threshold: the threshold for making sure that a keypoint is active
+            :return: returns if all the body keypoints are detected
+        """
+
         k = 0
         for pair_of_index in self.keypoint.ANGLES:
             for point_index in pair_of_index:
@@ -84,29 +90,40 @@ class MoveNetPredictor:
             if c1 > confidence_threshold and c2 > confidence_threshold:
                 cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, self.line_thickness)
 
-        # ------ drawing the points -----
+        # ------ drawing the points for elbows and knees-----
         for keypoint in self.shaped:
             (kpts_y, kpts_x, kpts_confidence) = keypoint
             if kpts_confidence > confidence_threshold:
                 if calculate_angles is True and self.active_keypoints(confidence_threshold) is True:
                     # ------- printing the angle values between the points that we want to use -----
+                    k = 0
                     for points in self.keypoint.ANGLES:
-                        # self.draw_angle_kpts(frame, points)
-                        angle = 180 - Geometry(self.shaped).calculate_angle([point for point in points])
-
                         # -------- preparing the points coordinates -------
                         (y1, x1) = self.shaped[points[0]][:2]
                         (y2, x2) = self.shaped[points[2]][:2]
                         (yc, xc) = self.shaped[points[1]][:2]
 
+                        if k < 2:
+                            angle = Geometry(self.shaped).calculate_angle([point for point in points])
+                            if k == 1 and x2 > xc:
+                                angle = 180 - angle
+                            if k == 0 and x2 < xc:
+                                angle = 180 - angle
+                        else:
+                            angle = 180 - Geometry(self.shaped).calculate_angle([point for point in points])
+
                         used_color = BGRColors().DARKRED
                         if 135 <= angle <= 180:
-                            cv2.line(frame, (int(x1), int(y1)), (int(xc), int(yc)), BGRColors().GREEN, self.line_thickness)
-                            cv2.line(frame, (int(x2), int(y2)), (int(xc), int(yc)), BGRColors().GREEN, self.line_thickness)
+                            cv2.line(frame, (int(x1), int(y1)), (int(xc), int(yc)), BGRColors().GREEN,
+                                     self.line_thickness)
+                            cv2.line(frame, (int(x2), int(y2)), (int(xc), int(yc)), BGRColors().GREEN,
+                                     self.line_thickness)
                             used_color = BGRColors().PINK
 
                         # --------- writing the angle value on the frame ------
-                        cv2.putText(frame, str(int(angle)), (int(xc) - 20, int(yc) - 40), cv2.FONT_HERSHEY_SIMPLEX, self.text_thickness, used_color, 3)
+                        cv2.putText(frame, str(int(angle)), (int(xc) - 20, int(yc) - 40), cv2.FONT_HERSHEY_SIMPLEX,
+                                    self.text_thickness, used_color, 3)
+                        k += 1
 
                     # ------- calculating the angle between the head and the body -----
                     head_2_body_angle = Geometry(self.shaped).head_to_body_angle()
@@ -119,14 +136,14 @@ class MoveNetPredictor:
                         used_color = BGRColors().DARKRED
 
                     # --------- writing the head to body angle near the head ------
-                    cv2.putText(frame, str(int(head_2_body_angle)), (int(xm) - 20, int(ym) - 40), cv2.FONT_HERSHEY_SIMPLEX, self.text_thickness, used_color, 3)
+                    cv2.putText(frame, str(int(head_2_body_angle)), (int(xm) - 20, int(ym) - 40),
+                                cv2.FONT_HERSHEY_SIMPLEX, self.text_thickness, used_color, 3)
 
         # ------ redrawing the dots on the lines ------
         for keypoint in self.shaped:
             (kpts_y, kpts_x, kpts_confidence) = keypoint
             if kpts_confidence > confidence_threshold:
                 cv2.circle(frame, (int(kpts_x), int(kpts_y)), self.circle_radius, BGRColors().RED, -1)
-
 
 
 class Keypoint:
@@ -152,19 +169,19 @@ class Keypoint:
 
     # Maps bones to a matplotlib color name.
     EDGES = {
-        (0, 1):   BGRColors().GREEN,
-        (0, 2):   BGRColors().GREEN,
-        (1, 3):   BGRColors().GREEN,
-        (2, 4):   BGRColors().GREEN,
-        (0, 5):   BGRColors().GREEN,
-        (0, 6):   BGRColors().GREEN,
-        (5, 7):   BGRColors().ORANGE,
-        (7, 9):   BGRColors().ORANGE,
-        (6, 8):   BGRColors().YELLOW,
-        (8, 10):  BGRColors().YELLOW,
-        (5, 6):   BGRColors().GREEN,
-        (5, 11):  BGRColors().GREEN,
-        (6, 12):  BGRColors().GREEN,
+        (0, 1): BGRColors().GREEN,
+        (0, 2): BGRColors().GREEN,
+        (1, 3): BGRColors().GREEN,
+        (2, 4): BGRColors().GREEN,
+        (0, 5): BGRColors().GREEN,
+        (0, 6): BGRColors().GREEN,
+        (5, 7): BGRColors().ORANGE,
+        (7, 9): BGRColors().ORANGE,
+        (6, 8): BGRColors().YELLOW,
+        (8, 10): BGRColors().YELLOW,
+        (5, 6): BGRColors().GREEN,
+        (5, 11): BGRColors().GREEN,
+        (6, 12): BGRColors().GREEN,
         (11, 12): BGRColors().GREEN,
         (11, 13): BGRColors().CYAN,
         (13, 15): BGRColors().CYAN,
@@ -173,8 +190,8 @@ class Keypoint:
     }
 
     ANGLES = [
-        [6, 8, 10],    # the right elbow angle joints
-        [5, 7, 9],     # the left elbow angle joints
+        [6, 8, 10],  # the right elbow angle joints
+        [5, 7, 9],  # the left elbow angle joints
         [12, 14, 16],  # the right knee angle joints
-        [11, 13, 15]   # the left knee angle joints
+        [11, 13, 15]  # the left knee angle joints
     ]
